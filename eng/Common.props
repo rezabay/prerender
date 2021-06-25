@@ -1,0 +1,10 @@
+<Project>
+
+  <Import Project="Version.props" />
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+</Project>

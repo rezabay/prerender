@@ -1,0 +1,43 @@
+version: "3"
+
+services:
+  postgresql:
+    image: kartoza/postgis:10.0-2.4
+    restart: always
+    environment:
+      - POSTGRES_USER=sa 
+      - POSTGRES_PASS=grmessage2018
+      - POSTGRES_DBNAME=gis
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql
+
+  start_dependencies:
+    image: dadarek/wait-for-dependencies
+    depends_on:
+      - postgresql
+    command: postgresql:5432
+
+  prerender:
+    image: prerender
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://*:5012
+      - Logging__LogLevel__Default=Information
+      - Logging__LogLevel__System=Information
+      - Logging__LogLevel__Microsoft=Information
+      - Settings__ChromeDriverPath=/opt/selenium/
+      - Settings__ChromeDriverFilename=chromedriver-87.0.4280.88
+      - Database__ConnectionString=Host=postgresql;Database=Riveet;Username=sa;Password=grmessage2018
+    ports:
+      - "5012:80"
+      - "4444:4444"
+    depends_on:
+      - start_dependencies
+
+volumes:
+  pg_data:

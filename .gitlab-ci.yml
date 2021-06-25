@@ -1,0 +1,76 @@
+default:
+  image: reza3307/riveetci:latest
+  tags:
+    - kubernetes
+    - fooreco
+
+stages:
+  - .pre
+  - build
+  - deploy
+
+variables:
+  REGISTRY: "$ECR/fooreco-prerender"
+  APP: prerender
+
+pre:
+  stage: .pre
+  script:
+    - BUILD_NAME="$(cat .version)"
+    - BUILD_VERSION="$BUILD_NAME.$CI_PIPELINE_IID"
+    - echo Build Version:$BUILD_VERSION
+    - echo BUILD_VERSION="${BUILD_VERSION}" >> $CI_PROJECT_DIR/variables.env
+  artifacts:
+    reports:
+      dotenv: variables.env
+  only:
+    - develop
+    - master
+
+build:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - echo Building image Version:$BUILD_VERSION
+    - mkdir -p /kaniko/.docker
+    - echo "{\"credsStore\":\"ecr-login\"}" > /kaniko/.docker/config.json
+    - /kaniko/executor --context $CI_PROJECT_DIR
+                       --build-arg=BUILD_NUMBER=$BUILD_VERSION
+                       --build-arg=NUGET_TOKEN=$CI_JOB_TOKEN
+                       --build-arg=NUGET_URL=$CI_SERVER_URL/api/v4/projects/23323241/packages/nuget/index.json
+                       --dockerfile Dockerfile 
+                       --destination $REGISTRY:$BUILD_VERSION 
+                       --destination $REGISTRY:latest
+  needs:
+    - job: pre
+      artifacts: true
+  only:
+    - develop
+    - master
+
+deploy-to-k8s-stg:
+  stage: deploy
+  script:
+    - echo "Deploying Version:$BUILD_VERSION"
+    - 'curl -X POST 
+            -F token=$K8S_CI_JOB_TOKEN -F "ref=master"
+            -F "variables[ENV]=stg"
+            -F "variables[APP]=$APP"
+            -F "variables[IMAGE_TAG]=$REGISTRY:$BUILD_VERSION"
+            https://gitlab.com/api/v4/projects/22375555/trigger/pipeline'
+  only:
+    - develop
+
+deploy-to-k8s-prd:
+  stage: deploy
+  script:
+    - echo "Deploying Version:$BUILD_VERSION"
+    - 'curl -X POST -F token=$K8S_CI_JOB_TOKEN -F "ref=master"
+      -F "variables[ENV]=prd"
+      -F "variables[APP]=$APP"
+      -F "variables[IMAGE_TAG]=$REGISTRY:$BUILD_VERSION"
+      https://gitlab.com/api/v4/projects/22375555/trigger/pipeline'
+  only:
+    - master
